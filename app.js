@@ -135,8 +135,26 @@
         });
 
       await room.connect(payload.url, payload.token);
-      await room.localParticipant.setCameraEnabled(true);
-      await room.localParticipant.setMicrophoneEnabled(true);
+
+      localLabel.textContent = displayName;
+      stage.hidden = false;
+      leaveBtn.disabled = false;
+      joinBtn.disabled = true;
+
+      let mediaWarning = "";
+      try {
+        await room.localParticipant.setCameraEnabled(true);
+      } catch (cameraError) {
+        console.warn(cameraError);
+        mediaWarning = "تعذر تشغيل الكاميرا (غالباً مستخدمة في النافذة الأخرى). ";
+      }
+
+      try {
+        await room.localParticipant.setMicrophoneEnabled(true);
+      } catch (micError) {
+        console.warn(micError);
+        mediaWarning += "تعذر تشغيل الميكروفون. ";
+      }
 
       const camPub = [...room.localParticipant.trackPublications.values()].find(
         (p) => p.track && p.track.kind === Track.Kind.Video
@@ -145,20 +163,26 @@
         camPub.track.attach(localVideo);
       }
 
-      localLabel.textContent = displayName;
-      stage.hidden = false;
-      leaveBtn.disabled = false;
-      joinBtn.disabled = true;
-      setStatus("متصل بالجلسة. افتح نفس الغرفة من جهاز آخر للتجربة.", false, true);
+      if (mediaWarning) {
+        setStatus(mediaWarning + "أنت متصل بالغرفة؛ جرّب نافذة/متصفح آخر أو أغلق الكاميرا في الأول.", true);
+      } else {
+        setStatus("متصل بالجلسة. افتح نفس الغرفة من متصفح آخر للتجربة.", false, true);
+      }
     } catch (error) {
       console.error(error);
-      setStatus(error instanceof Error ? error.message : "فشل الانضمام للجلسة.", true);
-      await leaveRoom();
+      const message = error instanceof Error ? error.message : "فشل الانضمام للجلسة.";
+      await cleanupConnection();
+      setStatus(message, true);
       setBusy(false);
     }
   }
 
   async function leaveRoom() {
+    await cleanupConnection();
+    setStatus("غادرت الجلسة. جاهز للانضمام مجدداً.");
+  }
+
+  async function cleanupConnection() {
     try {
       if (room) {
         await room.disconnect();
@@ -169,7 +193,6 @@
       room = null;
       resetStage();
       setBusy(false);
-      setStatus("غادرت الجلسة. جاهز للانضمام مجدداً.");
     }
   }
 
