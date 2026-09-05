@@ -9,10 +9,12 @@
   const externalJwtInput = document.getElementById("externalJwt");
   const displayNameInput = document.getElementById("displayName");
   const roomNameInput = document.getElementById("roomName");
+  const enableCameraInput = document.getElementById("enableCamera");
   const joinBtn = document.getElementById("joinBtn");
   const leaveBtn = document.getElementById("leaveBtn");
   const suggestRoomBtn = document.getElementById("suggestRoomBtn");
   const devTokenBtn = document.getElementById("devTokenBtn");
+  const enableCameraBtn = document.getElementById("enableCameraBtn");
   const statusEl = document.getElementById("status");
   const stage = document.getElementById("stage");
   const localVideo = document.getElementById("localVideo");
@@ -20,6 +22,9 @@
   const remoteGrid = document.getElementById("remoteGrid");
 
   const storageKey = "wasl-livekit-demo";
+  const clientInstanceId =
+    (window.crypto && crypto.randomUUID && crypto.randomUUID()) ||
+    `inst-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
   /** @type {import('livekit-client').Room | null} */
   let room = null;
@@ -39,8 +44,11 @@
   devTokenBtn.addEventListener("click", () => {
     void mintDevExternalToken();
   });
+  enableCameraBtn.addEventListener("click", () => {
+    void enableCameraNow();
+  });
 
-  [apiBaseUrlInput, externalJwtInput, displayNameInput, roomNameInput].forEach((el) => {
+  [apiBaseUrlInput, externalJwtInput, displayNameInput, roomNameInput, enableCameraInput].forEach((el) => {
     el.addEventListener("change", persistForm);
   });
 
@@ -77,8 +85,9 @@
   async function joinRoom() {
     const apiBaseUrl = apiBaseUrlInput.value.trim().replace(/\/+$/, "");
     const jwt = externalJwtInput.value.trim();
-    const displayName = displayNameInput.value.trim() || "مشارك";
+    const displayName = displayNameInput.value.trim() || `مشارك-${clientInstanceId.slice(0, 6)}`;
     const roomName = roomNameInput.value.trim();
+    const wantCamera = !!enableCameraInput.checked;
 
     if (!apiBaseUrl || !roomName) {
       setStatus("يرجى تعبئة عنوان الـ API واسم الغرفة.", true);
@@ -86,7 +95,7 @@
     }
 
     if (!jwt) {
-      setStatus("احصل على رمز تجريبي محلي أولاً، أو الصق JWT يقبله هذا الـ API.", true);
+      setStatus("احصل على رمز تجريبي محلي أولاً في هذا المتصفح (كل متصفح يحتاج رمزاً خاصاً).", true);
       return;
     }
 
@@ -104,6 +113,7 @@
         body: JSON.stringify({
           roomName,
           displayName,
+          clientInstanceId,
         }),
       });
 
@@ -112,7 +122,7 @@
         throw new Error(formatApiError(payload, tokenResponse.status));
       }
 
-      const { Room, RoomEvent, Track } = LivekitClient;
+      const { Room, RoomEvent, Track, DisconnectReason } = LivekitClient;
       room = new Room({
         adaptiveStream: true,
         dynacast: true,
@@ -128,27 +138,23 @@
           track.detach().forEach((el) => el.remove());
           cleanupEmptyRemoteTiles();
         })
-        .on(RoomEvent.Disconnected, () => {
-          setStatus("تم قطع الاتصال.", false);
+        .on(RoomEvent.Disconnected, (reason) => {
+          const reasonText = formatDisconnectReason(reason, DisconnectReason);
+          setStatus(`تم قطع الاتصال: ${reasonText}`, true);
+          room = null;
           resetStage();
           setBusy(false);
         });
 
       await room.connect(payload.url, payload.token);
 
-      localLabel.textContent = displayName;
+      localLabel.textContent = `${displayName} (${payload.identity || room.localParticipant.identity})`;
       stage.hidden = false;
       leaveBtn.disabled = false;
       joinBtn.disabled = true;
+      enableCameraBtn.disabled = false;
 
       let mediaWarning = "";
-      try {
-        await room.localParticipant.setCameraEnabled(true);
-      } catch (cameraError) {
-        console.warn(cameraError);
-        mediaWarning = "تعذر تشغيل الكاميرا (غالباً مستخدمة في النافذة الأخرى). ";
-      }
-
       try {
         await room.localParticipant.setMicrophoneEnabled(true);
       } catch (micError) {
@@ -156,17 +162,28 @@
         mediaWarning += "تعذر تشغيل الميكروفون. ";
       }
 
-      const camPub = [...room.localParticipant.trackPublications.values()].find(
-        (p) => p.track && p.track.kind === Track.Kind.Video
-      );
-      if (camPub?.track) {
-        camPub.track.attach(localVideo);
+      if (wantCamera) {
+        try {
+          await room.localParticipant.setCameraEnabled(true);
+          attachLocalCamera(Track);
+        } catch (cameraError) {
+          console.warn(cameraError);
+          mediaWarning +=
+            "تعذر تشغيل الكاميرا على هذا الجهاز (غالباً مستخدمة في المتصفح الآخر). يمكنك البقاء بالصوت فقط. ";
+        }
       }
 
+      const remoteCount = room.remoteParticipants.size;
+      const base =
+        `متصل كهوية ${payload.identity}. مشاركون آخرون الآن: ${remoteCount}. ` +
+        "في كل متصفح: رمز تجريبي منفصل + نفس اسم الغرفة.";
+
       if (mediaWarning) {
-        setStatus(mediaWarning + "أنت متصل بالغرفة؛ جرّب نافذة/متصفح آخر أو أغلق الكاميرا في الأول.", true);
+        setStatus(mediaWarning + base, true);
+      } else if (!wantCamera) {
+        setStatus("متصل بدون كاميرا (أنسب لجهازين على نفس الجهاز). " + base, false, true);
       } else {
-        setStatus("متصل بالجلسة. افتح نفس الغرفة من متصفح آخر للتجربة.", false, true);
+        setStatus(base, false, true);
       }
     } catch (error) {
       console.error(error);
@@ -174,6 +191,35 @@
       await cleanupConnection();
       setStatus(message, true);
       setBusy(false);
+    }
+  }
+
+  async function enableCameraNow() {
+    if (!room) {
+      setStatus("انضم للجلسة أولاً.", true);
+      return;
+    }
+
+    try {
+      await room.localParticipant.setCameraEnabled(true);
+      const { Track } = LivekitClient;
+      attachLocalCamera(Track);
+      setStatus("تم تشغيل الكاميرا.", false, true);
+    } catch (error) {
+      console.warn(error);
+      setStatus(
+        "تعذر تشغيل الكاميرا. على نفس الجهاز غالباً متصفح واحد فقط يستطيع استخدام الكاميرا.",
+        true
+      );
+    }
+  }
+
+  function attachLocalCamera(Track) {
+    const camPub = [...room.localParticipant.trackPublications.values()].find(
+      (p) => p.track && p.track.kind === Track.Kind.Video
+    );
+    if (camPub?.track) {
+      camPub.track.attach(localVideo);
     }
   }
 
@@ -197,11 +243,12 @@
   }
 
   function attachRemoteTrack(track, participant) {
-    let tile = remoteGrid.querySelector(`[data-identity="${CSS.escape(participant.identity)}"]`);
+    const identityKey = String(participant.identity || "").replace(/"/g, "");
+    let tile = remoteGrid.querySelector(`[data-identity="${identityKey}"]`);
     if (!tile) {
       tile = document.createElement("div");
       tile.className = "tile remote";
-      tile.dataset.identity = participant.identity;
+      tile.dataset.identity = identityKey;
 
       const label = document.createElement("span");
       label.className = "tile-label";
@@ -232,6 +279,7 @@
     stage.hidden = true;
     leaveBtn.disabled = true;
     joinBtn.disabled = false;
+    enableCameraBtn.disabled = true;
   }
 
   function setBusy(isBusy) {
@@ -251,6 +299,7 @@
       apiBaseUrl: apiBaseUrlInput.value,
       displayName: displayNameInput.value,
       roomName: roomNameInput.value,
+      enableCamera: !!enableCameraInput.checked,
     };
     try {
       localStorage.setItem(storageKey, JSON.stringify(data));
@@ -262,6 +311,7 @@
   function restoreForm() {
     apiBaseUrlInput.value = "https://localhost:7056";
     roomNameInput.value = "demo-room-1";
+    enableCameraInput.checked = false;
     try {
       const raw = localStorage.getItem(storageKey);
       if (!raw) {
@@ -271,6 +321,7 @@
       if (data.apiBaseUrl) apiBaseUrlInput.value = data.apiBaseUrl;
       if (data.displayName) displayNameInput.value = data.displayName;
       if (data.roomName) roomNameInput.value = data.roomName;
+      if (typeof data.enableCamera === "boolean") enableCameraInput.checked = data.enableCamera;
     } catch {
       /* ignore */
     }
@@ -289,11 +340,34 @@
       return `${payload.message}${payload.code ? ` (${payload.code})` : ""}`;
     }
     if (status === 401 || status === 403) {
-      return "رمز الدخول غير مقبول لهذا الـ API. للتجربة المحلية اضغط «احصل على رمز تجريبي محلي» (رموز الإنتاج لا تعمل مع Jwt المحلي).";
+      return "رمز الدخول غير مقبول لهذا الـ API. في كل متصفح اضغط «احصل على رمز تجريبي محلي».";
     }
     if (status === 0) {
-      return "تعذر الوصول للـ API. استخدم عنوان HTTPS مثل https://localhost:7056 وتحقق من CORS.";
+      return "تعذر الوصول للـ API. استخدم https://localhost:7056.";
     }
-    return `فشل طلب الرمز (HTTP ${status}). تأكد أن LiveKit مفعّل على الخادم.`;
+    return `فشل طلب الرمز (HTTP ${status}). تأكد أن LiveKit مفعّل وأنك أعدت تشغيل الـ API.`;
+  }
+
+  function formatDisconnectReason(reason, DisconnectReason) {
+    if (reason == null) {
+      return "سبب غير معروف";
+    }
+
+    if (DisconnectReason) {
+      if (reason === DisconnectReason.DUPLICATE_IDENTITY || reason === "DUPLICATE_IDENTITY") {
+        return "هوية مكررة — متصفح آخر دخل بنفس الهوية. أعد «احصل على رمز تجريبي محلي» في كل متصفح ثم انضم.";
+      }
+      if (reason === DisconnectReason.CLIENT_INITIATED || reason === "CLIENT_INITIATED") {
+        return "تم المغادرة من هذا المتصفح.";
+      }
+      if (reason === DisconnectReason.ROOM_DELETED || reason === "ROOM_DELETED") {
+        return "تم إغلاق الغرفة.";
+      }
+      if (reason === DisconnectReason.JOIN_FAILURE || reason === "JOIN_FAILURE") {
+        return "فشل الانضمام / شبكة.";
+      }
+    }
+
+    return String(reason);
   }
 })();
