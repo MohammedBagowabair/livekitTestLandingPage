@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>وصل أكاديمي — جلسة فيديو مباشرة</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.15.8/dist/livekit-client.umd.min.js"></script>
+</head>
+<body>
+  <div class="atmosphere" aria-hidden="true"></div>
+
+  <main class="shell">
+    <header class="hero">
+      <p class="brand">وصل أكاديمي</p>
+      <h1>جلسة فيديو مباشرة</h1>
+      <p class="lede">انضم لغرفة تجريبية مباشرة. لا يتم تسجيل أو حفظ الفيديو في هذا العرض.</p>
+    </header>
+
+    <section class="panel" id="join-panel" aria-labelledby="join-heading">
+      <h2 id="join-heading" class="sr-only">بيانات الانضمام</h2>
+
+      <label class="field">
+        <span>عنوان واجهة البرمجة (API)</span>
+        <input id="apiBaseUrl" type="url" autocomplete="off" placeholder="https://localhost:7202" />
+      </label>
+
+      <label class="field">
+        <span>رمز الدخول الخارجي (JWT)</span>
+        <textarea id="externalJwt" rows="3" autocomplete="off" placeholder="الصق رمز JWT الخارجي هنا"></textarea>
+      </label>
+
+      <div class="row">
+        <label class="field">
+          <span>اسم العرض</span>
+          <input id="displayName" type="text" autocomplete="nickname" placeholder="مثال: المعلمة سارة" />
+        </label>
+        <label class="field">
+          <span>اسم الغرفة</span>
+          <input id="roomName" type="text" autocomplete="off" placeholder="demo-room-1" />
+        </label>
+      </div>
+
+      <div class="actions">
+        <button type="button" id="joinBtn" class="btn primary">انضم للجلسة</button>
+        <button type="button" id="leaveBtn" class="btn ghost" disabled>مغادرة</button>
+        <button type="button" id="suggestRoomBtn" class="btn link">اقتراح اسم غرفة</button>
+      </div>
+
+      <p id="status" class="status" role="status">جاهز للانضمام.</p>
+    </section>
+
+    <section class="stage" id="stage" hidden>
+      <div class="tile local">
+        <video id="localVideo" autoplay playsinline muted></video>
+        <span class="tile-label" id="localLabel">أنت</span>
+      </div>
+      <div id="remoteGrid" class="remote-grid"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
