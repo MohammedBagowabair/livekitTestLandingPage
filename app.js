@@ -12,6 +12,7 @@
   const joinBtn = document.getElementById("joinBtn");
   const leaveBtn = document.getElementById("leaveBtn");
   const suggestRoomBtn = document.getElementById("suggestRoomBtn");
+  const devTokenBtn = document.getElementById("devTokenBtn");
   const statusEl = document.getElementById("status");
   const stage = document.getElementById("stage");
   const localVideo = document.getElementById("localVideo");
@@ -35,10 +36,43 @@
     roomNameInput.value = `demo-room-${Math.random().toString(16).slice(2, 10)}`;
     persistForm();
   });
+  devTokenBtn.addEventListener("click", () => {
+    void mintDevExternalToken();
+  });
 
   [apiBaseUrlInput, externalJwtInput, displayNameInput, roomNameInput].forEach((el) => {
     el.addEventListener("change", persistForm);
   });
+
+  async function mintDevExternalToken() {
+    const apiBaseUrl = apiBaseUrlInput.value.trim().replace(/\/+$/, "");
+    if (!apiBaseUrl) {
+      setStatus("أدخل عنوان الـ API أولاً (مثال: https://localhost:7056).", true);
+      return;
+    }
+
+    setStatus("جاري طلب رمز تجريبي محلي…");
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/demo/livekit/dev-external-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: displayNameInput.value.trim() || "مشارك تجريبي",
+        }),
+      });
+      const payload = await readJsonSafe(response);
+      if (!response.ok) {
+        throw new Error(formatApiError(payload, response.status));
+      }
+
+      externalJwtInput.value = payload.accessToken || "";
+      persistForm();
+      setStatus("تم تعبئة رمز تجريبي محلي. يمكنك الآن الانضمام للجلسة.", false, true);
+    } catch (error) {
+      console.error(error);
+      setStatus(error instanceof Error ? error.message : "فشل طلب الرمز التجريبي.", true);
+    }
+  }
 
   async function joinRoom() {
     const apiBaseUrl = apiBaseUrlInput.value.trim().replace(/\/+$/, "");
@@ -46,8 +80,13 @@
     const displayName = displayNameInput.value.trim() || "مشارك";
     const roomName = roomNameInput.value.trim();
 
-    if (!apiBaseUrl || !jwt || !roomName) {
-      setStatus("يرجى تعبئة عنوان الـ API ورمز JWT واسم الغرفة.", true);
+    if (!apiBaseUrl || !roomName) {
+      setStatus("يرجى تعبئة عنوان الـ API واسم الغرفة.", true);
+      return;
+    }
+
+    if (!jwt) {
+      setStatus("احصل على رمز تجريبي محلي أولاً، أو الصق JWT يقبله هذا الـ API.", true);
       return;
     }
 
@@ -175,6 +214,7 @@
   function setBusy(isBusy) {
     joinBtn.disabled = isBusy || !!room;
     suggestRoomBtn.disabled = isBusy;
+    devTokenBtn.disabled = isBusy;
   }
 
   function setStatus(message, isError = false, isOk = false) {
@@ -197,7 +237,7 @@
   }
 
   function restoreForm() {
-    apiBaseUrlInput.value = "https://localhost:7202";
+    apiBaseUrlInput.value = "https://localhost:7056";
     roomNameInput.value = "demo-room-1";
     try {
       const raw = localStorage.getItem(storageKey);
@@ -226,10 +266,10 @@
       return `${payload.message}${payload.code ? ` (${payload.code})` : ""}`;
     }
     if (status === 401 || status === 403) {
-      return "رمز الدخول غير صالح أو منتهي. الصق JWT خارجي صالح.";
+      return "رمز الدخول غير مقبول لهذا الـ API. للتجربة المحلية اضغط «احصل على رمز تجريبي محلي» (رموز الإنتاج لا تعمل مع Jwt المحلي).";
     }
     if (status === 0) {
-      return "تعذر الوصول للـ API. تحقق من العنوان وإعدادات CORS.";
+      return "تعذر الوصول للـ API. استخدم عنوان HTTPS مثل https://localhost:7056 وتحقق من CORS.";
     }
     return `فشل طلب الرمز (HTTP ${status}). تأكد أن LiveKit مفعّل على الخادم.`;
   }

@@ -16,8 +16,9 @@ Expected URL:
    - `LiveKit:Enabled=true`
    - `LiveKit:Url` / `LiveKit:ApiKey` / `LiveKit:ApiSecret`
 2. Open this page (Pages URL or a local static server).
-3. Paste API base URL, external JWT, display name, and the same room name on both devices.
-4. Click **انضم للجلسة**.
+3. Set API base to your local HTTPS URL (e.g. `https://localhost:7056`).
+4. Click **احصل على رمز تجريبي محلي** (do not paste a production JWT against local API).
+5. Enter display name + room name, then **انضم للجلسة**.
 
 CORS on the API must include `https://mohammedbagowabair.github.io`.
 
