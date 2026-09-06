@@ -4,23 +4,28 @@ Arabic RTL demo UI for live video sessions via LiveKit. This site only requests 
 
 ## GitHub Pages
 
-After pushing `main`, enable Pages: **Settings → Pages → Deploy from branch `main` / root (`/`)**.
+- Site: `https://mohammedbagowabair.github.io/livekitTestLandingPage/`
 
-Expected URL:
+## Online demo (production API)
 
-- Project site: `https://mohammedbagowabair.github.io/livekitTestLandingPage/`
+1. Open the Pages URL.
+2. API base is already `https://api.waslacademy.net`.
+3. Log in to WaslAcademy, copy your external **Bearer JWT**, paste it into the page.
+4. Same room name on both devices → **انضم للجلسة**.
 
-## How to use
+Requirements on the API host:
 
-1. Run WaslAcademy API locally (or non-prod) with LiveKit enabled via user-secrets:
-   - `LiveKit:Enabled=true`
-   - `LiveKit:Url` / `LiveKit:ApiKey` / `LiveKit:ApiSecret`
-2. Open this page (Pages URL or a local static server).
-3. Set API base to your local HTTPS URL (e.g. `https://localhost:7056`).
-4. Click **احصل على رمز تجريبي محلي** (do not paste a production JWT against local API).
-5. Enter display name + room name, then **انضم للجلسة**.
+- `LiveKit__Enabled=true`
+- `LiveKit__Url` / `LiveKit__ApiKey` / `LiveKit__ApiSecret`
+- CORS includes `https://mohammedbagowabair.github.io`
 
-CORS on the API must include `https://mohammedbagowabair.github.io`.
+`POST /api/demo/livekit/dev-external-token` works **only in Development** (localhost). It will not work against production.
+
+## Local Development API
+
+1. Run the API with LiveKit user-secrets enabled.
+2. Set API base to `https://localhost:7056`.
+3. Use **احصل على رمز تجريبي محلي**, then join.
 
 ## Security
 

@@ -21,7 +21,8 @@
   const localLabel = document.getElementById("localLabel");
   const remoteGrid = document.getElementById("remoteGrid");
 
-  const storageKey = "wasl-livekit-demo";
+  const storageKey = "wasl-livekit-demo-v2";
+  const defaultApiBaseUrl = "https://api.waslacademy.net";
   const clientInstanceId =
     (window.crypto && crypto.randomUUID && crypto.randomUUID()) ||
     `inst-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -30,6 +31,11 @@
   let room = null;
 
   restoreForm();
+  setStatus(
+    "جاهز. للتجربة أونلاين استخدم https://api.waslacademy.net والصق JWT من تسجيل الدخول.",
+    false,
+    true
+  );
 
   joinBtn.addEventListener("click", () => {
     void joinRoom();
@@ -55,11 +61,19 @@
   async function mintDevExternalToken() {
     const apiBaseUrl = apiBaseUrlInput.value.trim().replace(/\/+$/, "");
     if (!apiBaseUrl) {
-      setStatus("أدخل عنوان الـ API أولاً (مثال: https://localhost:7056).", true);
+      setStatus("أدخل عنوان الـ API أولاً.", true);
       return;
     }
 
-    setStatus("جاري طلب رمز تجريبي محلي…");
+    if (isProductionApi(apiBaseUrl)) {
+      setStatus(
+        "الرمز التجريبي المحلي لا يعمل على api.waslacademy.net. سجّل الدخول في WaslAcademy والصق JWT الحقيقي هنا.",
+        true
+      );
+      return;
+    }
+
+    setStatus("جاري طلب رمز تجريبي محلي (Development فقط)…");
     try {
       const response = await fetch(`${apiBaseUrl}/api/demo/livekit/dev-external-token`, {
         method: "POST",
@@ -78,7 +92,13 @@
       setStatus("تم تعبئة رمز تجريبي محلي. يمكنك الآن الانضمام للجلسة.", false, true);
     } catch (error) {
       console.error(error);
-      setStatus(error instanceof Error ? error.message : "فشل طلب الرمز التجريبي.", true);
+      const message =
+        error instanceof Error && /Failed to fetch|NetworkError|fetch/i.test(error.message)
+          ? "فشل الاتصال بالـ API المحلي. تأكد أن الـ API يعمل على جهازك، أو استخدم https://api.waslacademy.net مع JWT حقيقي."
+          : error instanceof Error
+            ? error.message
+            : "فشل طلب الرمز التجريبي.";
+      setStatus(message, true);
     }
   }
 
@@ -95,7 +115,12 @@
     }
 
     if (!jwt) {
-      setStatus("احصل على رمز تجريبي محلي أولاً في هذا المتصفح (كل متصفح يحتاج رمزاً خاصاً).", true);
+      setStatus(
+        isProductionApi(apiBaseUrl)
+          ? "الصق JWT من تسجيل دخول WaslAcademy (الرمز التجريبي المحلي لا يعمل على الإنتاج)."
+          : "احصل على رمز تجريبي محلي أولاً، أو الصق JWT يقبله هذا الـ API.",
+        true
+      );
       return;
     }
 
@@ -309,7 +334,7 @@
   }
 
   function restoreForm() {
-    apiBaseUrlInput.value = "https://localhost:7056";
+    apiBaseUrlInput.value = defaultApiBaseUrl;
     roomNameInput.value = "demo-room-1";
     enableCameraInput.checked = false;
     try {
@@ -318,12 +343,32 @@
         return;
       }
       const data = JSON.parse(raw);
-      if (data.apiBaseUrl) apiBaseUrlInput.value = data.apiBaseUrl;
+      if (data.apiBaseUrl && !isLocalhostApi(data.apiBaseUrl)) {
+        apiBaseUrlInput.value = data.apiBaseUrl;
+      }
       if (data.displayName) displayNameInput.value = data.displayName;
       if (data.roomName) roomNameInput.value = data.roomName;
       if (typeof data.enableCamera === "boolean") enableCameraInput.checked = data.enableCamera;
     } catch {
       /* ignore */
+    }
+  }
+
+  function isProductionApi(url) {
+    try {
+      const host = new URL(url).hostname.toLowerCase();
+      return host === "api.waslacademy.net" || host.endsWith(".waslacademy.net");
+    } catch {
+      return /api\.waslacademy\.net/i.test(url);
+    }
+  }
+
+  function isLocalhostApi(url) {
+    try {
+      const host = new URL(url).hostname.toLowerCase();
+      return host === "localhost" || host === "127.0.0.1";
+    } catch {
+      return /localhost|127\.0\.0\.1/i.test(url);
     }
   }
 
@@ -340,12 +385,12 @@
       return `${payload.message}${payload.code ? ` (${payload.code})` : ""}`;
     }
     if (status === 401 || status === 403) {
-      return "رمز الدخول غير مقبول لهذا الـ API. في كل متصفح اضغط «احصل على رمز تجريبي محلي».";
+      return "رمز الدخول غير مقبول. على الإنتاج الصق JWT حقيقي من تسجيل دخول WaslAcademy.";
     }
     if (status === 0) {
-      return "تعذر الوصول للـ API. استخدم https://localhost:7056.";
+      return "تعذر الوصول للـ API. استخدم https://api.waslacademy.net.";
     }
-    return `فشل طلب الرمز (HTTP ${status}). تأكد أن LiveKit مفعّل وأنك أعدت تشغيل الـ API.`;
+    return `فشل طلب الرمز (HTTP ${status}). تأكد أن LiveKit مفعّل على الخادم (LiveKit__Enabled=true).`;
   }
 
   function formatDisconnectReason(reason, DisconnectReason) {

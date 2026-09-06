@@ -17,7 +17,7 @@
     <header class="hero">
       <p class="brand">وصل أكاديمي</p>
       <h1>جلسة فيديو مباشرة</h1>
-      <p class="lede">انضم لغرفة تجريبية مباشرة. لا يتم تسجيل أو حفظ الفيديو في هذا العرض.</p>
+      <p class="lede">انضم لغرفة تجريبية مباشرة عبر واجهة وصل أكاديمي. لا يتم تسجيل أو حفظ الفيديو في هذا العرض.</p>
     </header>
 
     <section class="panel" id="join-panel" aria-labelledby="join-heading">
@@ -25,13 +25,18 @@
 
       <label class="field">
         <span>عنوان واجهة البرمجة (API)</span>
-        <input id="apiBaseUrl" type="url" autocomplete="off" placeholder="https://localhost:7202" />
+        <input id="apiBaseUrl" type="url" autocomplete="off" placeholder="https://api.waslacademy.net" value="https://api.waslacademy.net" />
       </label>
 
       <label class="field">
         <span>رمز الدخول الخارجي (JWT)</span>
-        <textarea id="externalJwt" rows="3" autocomplete="off" placeholder="للتجربة المحلية: اضغط «احصل على رمز تجريبي محلي»"></textarea>
+        <textarea id="externalJwt" rows="3" autocomplete="off" placeholder="الصق رمز JWT من تسجيل دخول WaslAcademy (للإنتاج). الرمز التجريبي المحلي يعمل فقط مع localhost."></textarea>
       </label>
+
+      <p class="hint">
+        للتجربة أونلاين: سجّل الدخول في WaslAcademy، انسخ الـ Bearer JWT، الصقه هنا، ثم انضم.
+        زر «رمز تجريبي محلي» مخصص فقط لـ API على جهازك (Development).
+      </p>
 
       <div class="row">
         <label class="field">
