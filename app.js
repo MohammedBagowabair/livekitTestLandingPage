@@ -6,14 +6,12 @@
   }
 
   const apiBaseUrlInput = document.getElementById("apiBaseUrl");
-  const externalJwtInput = document.getElementById("externalJwt");
   const displayNameInput = document.getElementById("displayName");
   const roomNameInput = document.getElementById("roomName");
   const enableCameraInput = document.getElementById("enableCamera");
   const joinBtn = document.getElementById("joinBtn");
   const leaveBtn = document.getElementById("leaveBtn");
   const suggestRoomBtn = document.getElementById("suggestRoomBtn");
-  const devTokenBtn = document.getElementById("devTokenBtn");
   const enableCameraBtn = document.getElementById("enableCameraBtn");
   const statusEl = document.getElementById("status");
   const stage = document.getElementById("stage");
@@ -21,7 +19,7 @@
   const localLabel = document.getElementById("localLabel");
   const remoteGrid = document.getElementById("remoteGrid");
 
-  const storageKey = "wasl-livekit-demo-v2";
+  const storageKey = "wasl-livekit-demo-v3-anon";
   const defaultApiBaseUrl = "https://api.waslacademy.net";
   const clientInstanceId =
     (window.crypto && crypto.randomUUID && crypto.randomUUID()) ||
@@ -32,7 +30,7 @@
 
   restoreForm();
   setStatus(
-    "جاهز. للتجربة أونلاين استخدم https://api.waslacademy.net والصق JWT من تسجيل الدخول.",
+    "جاهز. لا حاجة لـ JWT — أدخل اسم الغرفة واسمك ثم انضم (يتطلب API مجهول + LiveKit مفعّل).",
     false,
     true
   );
@@ -47,64 +45,16 @@
     roomNameInput.value = `demo-room-${Math.random().toString(16).slice(2, 10)}`;
     persistForm();
   });
-  devTokenBtn.addEventListener("click", () => {
-    void mintDevExternalToken();
-  });
   enableCameraBtn.addEventListener("click", () => {
     void enableCameraNow();
   });
 
-  [apiBaseUrlInput, externalJwtInput, displayNameInput, roomNameInput, enableCameraInput].forEach((el) => {
+  [apiBaseUrlInput, displayNameInput, roomNameInput, enableCameraInput].forEach((el) => {
     el.addEventListener("change", persistForm);
   });
 
-  async function mintDevExternalToken() {
-    const apiBaseUrl = apiBaseUrlInput.value.trim().replace(/\/+$/, "");
-    if (!apiBaseUrl) {
-      setStatus("أدخل عنوان الـ API أولاً.", true);
-      return;
-    }
-
-    if (isProductionApi(apiBaseUrl)) {
-      setStatus(
-        "الرمز التجريبي المحلي لا يعمل على api.waslacademy.net. سجّل الدخول في WaslAcademy والصق JWT الحقيقي هنا.",
-        true
-      );
-      return;
-    }
-
-    setStatus("جاري طلب رمز تجريبي محلي (Development فقط)…");
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/demo/livekit/dev-external-token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          displayName: displayNameInput.value.trim() || "مشارك تجريبي",
-        }),
-      });
-      const payload = await readJsonSafe(response);
-      if (!response.ok) {
-        throw new Error(formatApiError(payload, response.status));
-      }
-
-      externalJwtInput.value = payload.accessToken || "";
-      persistForm();
-      setStatus("تم تعبئة رمز تجريبي محلي. يمكنك الآن الانضمام للجلسة.", false, true);
-    } catch (error) {
-      console.error(error);
-      const message =
-        error instanceof Error && /Failed to fetch|NetworkError|fetch/i.test(error.message)
-          ? "فشل الاتصال بالـ API المحلي. تأكد أن الـ API يعمل على جهازك، أو استخدم https://api.waslacademy.net مع JWT حقيقي."
-          : error instanceof Error
-            ? error.message
-            : "فشل طلب الرمز التجريبي.";
-      setStatus(message, true);
-    }
-  }
-
   async function joinRoom() {
     const apiBaseUrl = apiBaseUrlInput.value.trim().replace(/\/+$/, "");
-    const jwt = externalJwtInput.value.trim();
     const displayName = displayNameInput.value.trim() || `مشارك-${clientInstanceId.slice(0, 6)}`;
     const roomName = roomNameInput.value.trim();
     const wantCamera = !!enableCameraInput.checked;
@@ -114,15 +64,6 @@
       return;
     }
 
-    if (!jwt) {
-      setStatus(
-        isProductionApi(apiBaseUrl)
-          ? "الصق JWT من تسجيل دخول WaslAcademy (الرمز التجريبي المحلي لا يعمل على الإنتاج)."
-          : "احصل على رمز تجريبي محلي أولاً، أو الصق JWT يقبله هذا الـ API.",
-        true
-      );
-      return;
-    }
 
     persistForm();
     setBusy(true);
@@ -133,7 +74,6 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${jwt}`,
         },
         body: JSON.stringify({
           roomName,
@@ -201,7 +141,7 @@
       const remoteCount = room.remoteParticipants.size;
       const base =
         `متصل كهوية ${payload.identity}. مشاركون آخرون الآن: ${remoteCount}. ` +
-        "في كل متصفح: رمز تجريبي منفصل + نفس اسم الغرفة.";
+        "في كل متصفح: نفس اسم الغرفة، أسماء عرض مختلفة.";
 
       if (mediaWarning) {
         setStatus(mediaWarning + base, true);
@@ -310,7 +250,6 @@
   function setBusy(isBusy) {
     joinBtn.disabled = isBusy || !!room;
     suggestRoomBtn.disabled = isBusy;
-    devTokenBtn.disabled = isBusy;
   }
 
   function setStatus(message, isError = false, isOk = false) {
@@ -385,12 +324,12 @@
       return `${payload.message}${payload.code ? ` (${payload.code})` : ""}`;
     }
     if (status === 401 || status === 403) {
-      return "رمز الدخول غير مقبول. على الإنتاج الصق JWT حقيقي من تسجيل دخول WaslAcademy.";
+      return "الـ API ما زال يطلب تسجيل دخول. انشر نسخة AllowAnonymous من /api/demo/livekit/token أولاً.";
     }
     if (status === 0) {
-      return "تعذر الوصول للـ API. استخدم https://api.waslacademy.net.";
+      return "تعذر الوصول للـ API (شبكة أو توقف الخدمة). تحقق من نشر المسار وأن الخادم يعمل.";
     }
-    return `فشل طلب الرمز (HTTP ${status}). تأكد أن LiveKit مفعّل على الخادم (LiveKit__Enabled=true).`;
+    return `فشل طلب رمز الغرفة (HTTP ${status}). تأكد أن LiveKit مفعّل (LiveKit__Enabled=true) وأن الـ API مجهول الهوية.`;
   }
 
   function formatDisconnectReason(reason, DisconnectReason) {
@@ -400,7 +339,7 @@
 
     if (DisconnectReason) {
       if (reason === DisconnectReason.DUPLICATE_IDENTITY || reason === "DUPLICATE_IDENTITY") {
-        return "هوية مكررة — متصفح آخر دخل بنفس الهوية. أعد «احصل على رمز تجريبي محلي» في كل متصفح ثم انضم.";
+        return "هوية مكررة — متصفح آخر دخل بنفس الهوية. أعد الانضمام (تُنشأ هوية جديدة لكل طلب).";
       }
       if (reason === DisconnectReason.CLIENT_INITIATED || reason === "CLIENT_INITIATED") {
         return "تم المغادرة من هذا المتصفح.";
