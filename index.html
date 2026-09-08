@@ -50,7 +50,7 @@
 
       <div class="actions">
         <button type="button" id="joinBtn" class="btn primary">انضم للجلسة</button>
-        <button type="button" id="enableCameraBtn" class="btn ghost" disabled>تشغيل الكاميرا الآن</button>
+        <button type="button" id="toggleCameraBtn" class="btn ghost" disabled>إيقاف الكاميرا</button>
         <button type="button" id="leaveBtn" class="btn ghost" disabled>مغادرة</button>
         <button type="button" id="suggestRoomBtn" class="btn link">اقتراح اسم غرفة</button>
       </div>
@@ -59,11 +59,15 @@
     </section>
 
     <section class="stage" id="stage" hidden>
-      <div class="tile local">
-        <video id="localVideo" autoplay playsinline muted></video>
-        <span class="tile-label" id="localLabel">أنت</span>
+      <div class="meet-toolbar">
+        <span id="roomBadge" class="room-badge"></span>
+        <div class="meet-controls">
+          <button type="button" id="toggleMicBtn" class="ctrl-btn" disabled title="ميكروفون">🎤</button>
+          <button type="button" id="toggleCameraBtnBar" class="ctrl-btn" disabled title="كاميرا">📷</button>
+          <button type="button" id="leaveBtnBar" class="ctrl-btn danger" disabled title="مغادرة">Leave</button>
+        </div>
       </div>
-      <div id="remoteGrid" class="remote-grid"></div>
+      <div id="meetGrid" class="meet-grid" aria-live="polite"></div>
     </section>
   </main>
 

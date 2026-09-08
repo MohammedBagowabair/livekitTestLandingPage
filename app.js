@@ -12,12 +12,14 @@
   const joinBtn = document.getElementById("joinBtn");
   const leaveBtn = document.getElementById("leaveBtn");
   const suggestRoomBtn = document.getElementById("suggestRoomBtn");
-  const enableCameraBtn = document.getElementById("enableCameraBtn");
+  const toggleCameraBtn = document.getElementById("toggleCameraBtn");
+  const toggleCameraBtnBar = document.getElementById("toggleCameraBtnBar");
+  const toggleMicBtn = document.getElementById("toggleMicBtn");
+  const leaveBtnBar = document.getElementById("leaveBtnBar");
+  const meetGrid = document.getElementById("meetGrid");
+  const roomBadge = document.getElementById("roomBadge");
   const statusEl = document.getElementById("status");
   const stage = document.getElementById("stage");
-  const localVideo = document.getElementById("localVideo");
-  const localLabel = document.getElementById("localLabel");
-  const remoteGrid = document.getElementById("remoteGrid");
 
   const storageKey = "wasl-livekit-demo-v3-anon";
   const defaultApiBaseUrl = "https://api.waslacademy.net";
@@ -45,8 +47,17 @@
     roomNameInput.value = `demo-room-${Math.random().toString(16).slice(2, 10)}`;
     persistForm();
   });
-  enableCameraBtn.addEventListener("click", () => {
-    void enableCameraNow();
+  toggleCameraBtn.addEventListener("click", () => {
+    void toggleCamera();
+  });
+  toggleCameraBtnBar.addEventListener("click", () => {
+    void toggleCamera();
+  });
+  toggleMicBtn.addEventListener("click", () => {
+    void toggleMic();
+  });
+  leaveBtnBar.addEventListener("click", () => {
+    void leaveRoom();
   });
 
   [apiBaseUrlInput, displayNameInput, roomNameInput, enableCameraInput].forEach((el) => {
@@ -130,11 +141,55 @@
 
       await room.connect(payload.url, payload.token);
 
-      localLabel.textContent = `${displayName} (${payload.identity || room.localParticipant.identity})`;
       stage.hidden = false;
       leaveBtn.disabled = false;
+      leaveBtnBar.disabled = false;
       joinBtn.disabled = true;
-      enableCameraBtn.disabled = false;
+      toggleCameraBtn.disabled = false;
+      toggleCameraBtnBar.disabled = false;
+      toggleMicBtn.disabled = false;
+      if (roomBadge) roomBadge.textContent = `Room: ${roomName}`;
+      ensureTile(payload.identity || room.localParticipant.identity, displayName, true);
+      if (!wantCamera) {
+        meetGrid.querySelector(".tile.local")?.classList.add("camera-off");
+      }
+      syncLocalCameraUi();
+      syncLocalMicUi();
+
+      room
+        .on(RoomEvent.TrackMuted, (pub, participant) => {
+          if (participant === room.localParticipant) {
+            syncLocalCameraUi();
+            syncLocalMicUi();
+            return;
+          }
+          const tile = meetGrid.querySelector(
+            `[data-identity="${String(participant.identity || "").replace(/"/g, "")}"]`
+          );
+          if (tile && pub.kind === Track.Kind.Video) tile.classList.add("camera-off");
+        })
+        .on(RoomEvent.TrackUnmuted, (pub, participant) => {
+          if (participant === room.localParticipant) {
+            syncLocalCameraUi();
+            syncLocalMicUi();
+            return;
+          }
+          const tile = meetGrid.querySelector(
+            `[data-identity="${String(participant.identity || "").replace(/"/g, "")}"]`
+          );
+          if (tile && pub.kind === Track.Kind.Video) tile.classList.remove("camera-off");
+        })
+        .on(RoomEvent.ParticipantDisconnected, (participant) => {
+          meetGrid
+            .querySelector(`[data-identity="${String(participant.identity || "").replace(/"/g, "")}"]`)
+            ?.remove();
+          updateGridCount();
+        })
+        .on(RoomEvent.ParticipantConnected, (participant) => {
+          ensureTile(participant.identity, participant.name || participant.identity, false).classList.add(
+            "camera-off"
+          );
+        });
 
       let mediaWarning = "";
       try {
@@ -153,7 +208,7 @@
       if (wantCamera) {
         try {
           await room.localParticipant.setCameraEnabled(true);
-          attachLocalCamera(Track);
+          attachLocalCamera();
         } catch (cameraError) {
           console.warn(cameraError);
           mediaWarning +=
@@ -182,33 +237,116 @@
     }
   }
 
-  async function enableCameraNow() {
+  async function toggleCamera() {
     if (!room) {
-      setStatus("Ø§Ù†Ø¶Ù… Ù„Ù„Ø¬Ù„Ø³Ø© Ø£ÙˆÙ„Ø§Ù‹.", true);
+      setStatus("Join the session first.", true);
       return;
     }
-
+    const next = !room.localParticipant.isCameraEnabled;
     try {
-      await room.localParticipant.setCameraEnabled(true);
-      const { Track } = LivekitClient;
-      attachLocalCamera(Track);
-      setStatus("ØªÙ… ØªØ´ØºÙŠÙ„ Ø§Ù„ÙƒØ§Ù…ÙŠØ±Ø§.", false, true);
+      await room.localParticipant.setCameraEnabled(next);
+      syncLocalCameraUi();
+      setStatus(next ? "Camera on." : "Camera off.", false, true);
     } catch (error) {
       console.warn(error);
-      setStatus(
-        "ØªØ¹Ø°Ø± ØªØ´ØºÙŠÙ„ Ø§Ù„ÙƒØ§Ù…ÙŠØ±Ø§. Ø¹Ù„Ù‰ Ù†ÙØ³ Ø§Ù„Ø¬Ù‡Ø§Ø² ØºØ§Ù„Ø¨Ø§Ù‹ Ù…ØªØµÙØ­ ÙˆØ§Ø­Ø¯ ÙÙ‚Ø· ÙŠØ³ØªØ·ÙŠØ¹ Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„ÙƒØ§Ù…ÙŠØ±Ø§.",
-        true
-      );
+      setStatus("Could not toggle camera on this device.", true);
     }
   }
 
-  function attachLocalCamera(Track) {
-    const camPub = [...room.localParticipant.trackPublications.values()].find(
-      (p) => p.track && p.track.kind === Track.Kind.Video
-    );
-    if (camPub?.track) {
-      camPub.track.attach(localVideo);
+  async function toggleMic() {
+    if (!room) {
+      setStatus("Join the session first.", true);
+      return;
     }
+    const next = !room.localParticipant.isMicrophoneEnabled;
+    try {
+      await room.localParticipant.setMicrophoneEnabled(next, {
+        autoGainControl: true,
+        echoCancellation: true,
+        noiseSuppression: true,
+        latency: 0,
+        channelCount: 1,
+      });
+      syncLocalMicUi();
+      setStatus(next ? "Mic on." : "Mic off.", false, true);
+    } catch (error) {
+      console.warn(error);
+      setStatus("Could not toggle microphone.", true);
+    }
+  }
+
+  function ensureTile(identity, labelText, isLocal) {
+    const key = String(identity || "").replace(/"/g, "");
+    let tile = meetGrid.querySelector(`[data-identity="${key}"]`);
+    if (!tile) {
+      tile = document.createElement("div");
+      tile.className = "tile" + (isLocal ? " local" : "");
+      tile.dataset.identity = key;
+
+      const video = document.createElement("video");
+      video.autoplay = true;
+      video.playsInline = true;
+      if (isLocal) video.muted = true;
+      tile.appendChild(video);
+
+      const avatar = document.createElement("div");
+      avatar.className = "tile-avatar";
+      const initial = (labelText || "?").trim().slice(0, 1) || "?";
+      avatar.textContent = initial;
+      tile.appendChild(avatar);
+
+      const label = document.createElement("span");
+      label.className = "tile-label";
+      label.textContent = labelText || identity;
+      tile.appendChild(label);
+
+      meetGrid.appendChild(tile);
+      updateGridCount();
+    } else {
+      const label = tile.querySelector(".tile-label");
+      if (label && labelText) label.textContent = labelText;
+      const avatar = tile.querySelector(".tile-avatar");
+      if (avatar && labelText) avatar.textContent = labelText.trim().slice(0, 1) || "?";
+    }
+    return tile;
+  }
+
+  function updateGridCount() {
+    meetGrid.dataset.count = String(meetGrid.querySelectorAll(".tile").length || 1);
+  }
+
+  function syncLocalCameraUi() {
+    if (!room) return;
+    const on = !!room.localParticipant.isCameraEnabled;
+    const tile = ensureTile(
+      room.localParticipant.identity,
+      displayNameInput.value.trim() || "You",
+      true
+    );
+    tile.classList.toggle("camera-off", !on);
+    toggleCameraBtn.textContent = on ? "Turn camera off" : "Turn camera on";
+    // keep Arabic button if present in HTML default - set bilingual short labels
+    toggleCameraBtn.textContent = on ? "إيقاف الكاميرا" : "تشغيل الكاميرا";
+    toggleCameraBtnBar.classList.toggle("off", !on);
+    if (on) {
+      const { Track } = LivekitClient;
+      const camPub = [...room.localParticipant.trackPublications.values()].find(
+        (p) => p.track && p.track.kind === Track.Kind.Video
+      );
+      const video = tile.querySelector("video");
+      if (camPub?.track && video) camPub.track.attach(video);
+    }
+  }
+
+  function syncLocalMicUi() {
+    if (!room) return;
+    const on = !!room.localParticipant.isMicrophoneEnabled;
+    toggleMicBtn.classList.toggle("off", !on);
+    toggleMicBtn.textContent = on ? "🎤" : "🔇";
+  }
+
+  function attachLocalCamera() {
+    syncLocalCameraUi();
   }
 
   async function leaveRoom() {
@@ -231,43 +369,41 @@
   }
 
   function attachRemoteTrack(track, participant) {
-    const identityKey = String(participant.identity || "").replace(/"/g, "");
-    let tile = remoteGrid.querySelector(`[data-identity="${identityKey}"]`);
-    if (!tile) {
-      tile = document.createElement("div");
-      tile.className = "tile remote";
-      tile.dataset.identity = identityKey;
-
-      const label = document.createElement("span");
-      label.className = "tile-label";
-      label.textContent = participant.name || participant.identity;
-      tile.appendChild(label);
-      remoteGrid.appendChild(tile);
-    }
-
-    const media = track.attach();
-    if (media instanceof HTMLMediaElement) {
-      media.playsInline = true;
-      media.autoplay = true;
-      tile.prepend(media);
+    const tile = ensureTile(
+      participant.identity,
+      participant.name || participant.identity,
+      false
+    );
+    const { Track } = LivekitClient;
+    if (track.kind === Track.Kind.Video) {
+      const video = tile.querySelector("video");
+      track.attach(video);
+      tile.classList.remove("camera-off");
+    } else if (track.kind === Track.Kind.Audio) {
+      const media = track.attach();
+      if (media instanceof HTMLMediaElement) {
+        media.autoplay = true;
+        media.style.display = "none";
+        tile.appendChild(media);
+      }
     }
   }
 
   function cleanupEmptyRemoteTiles() {
-    [...remoteGrid.querySelectorAll(".tile")].forEach((tile) => {
-      if (!tile.querySelector("video, audio")) {
-        tile.remove();
-      }
-    });
+    updateGridCount();
   }
 
   function resetStage() {
-    localVideo.srcObject = null;
-    remoteGrid.innerHTML = "";
+    meetGrid.innerHTML = "";
+    meetGrid.dataset.count = "1";
+    if (roomBadge) roomBadge.textContent = "";
     stage.hidden = true;
     leaveBtn.disabled = true;
+    leaveBtnBar.disabled = true;
     joinBtn.disabled = false;
-    enableCameraBtn.disabled = true;
+    toggleCameraBtn.disabled = true;
+    toggleCameraBtnBar.disabled = true;
+    toggleMicBtn.disabled = true;
   }
 
   function setBusy(isBusy) {
