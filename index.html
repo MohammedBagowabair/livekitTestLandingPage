@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>وصل أكاديمي — جلسة فيديو مباشرة</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -12,26 +12,22 @@
 </head>
 <body>
   <div class="atmosphere" aria-hidden="true"></div>
-
   <main class="shell">
     <header class="hero">
       <p class="brand">وصل أكاديمي</p>
       <h1>جلسة فيديو مباشرة</h1>
-      <p class="lede">انضم لغرفة تجريبية مباشرة عبر واجهة وصل أكاديمي. لا يتم تسجيل أو حفظ الفيديو في هذا العرض.</p>
+      <p class="lede">واجهة شبيهة بـ Google Meet لعدد كبير من المشاركين. انضم لغرفة تجريبية مباشرة — لا يتم تسجيل أو حفظ الفيديو في هذا العرض.</p>
     </header>
-
-    <section class="panel" id="join-panel" aria-labelledby="join-heading">
+    <section class="panel join-panel" id="join-panel" aria-labelledby="join-heading">
       <h2 id="join-heading" class="sr-only">بيانات الانضمام</h2>
-
       <label class="field">
         <span>عنوان واجهة البرمجة (API)</span>
         <input id="apiBaseUrl" type="url" autocomplete="off" placeholder="https://api.waslacademy.net" value="https://api.waslacademy.net" />
       </label>
       <p class="hint">
-        لا حاجة لتسجيل دخول أو لصق JWT. اختر اسم عرض واسم غرفة ثم انضم.
-        يتطلب مسار تجربة مجهول على الـ API مع تفعيل LiveKit على الخادم.
+        لا حاجة لرمز JWT. الصفحة تطلب رمز جلسة LiveKit مباشرة من الـ API ثم تتصل بالغرفة.
+        افتح نفس اسم الغرفة على أجهزة متعددة للتجربة.
       </p>
-
       <div class="row">
         <label class="field">
           <span>اسم العرض</span>
@@ -42,35 +38,38 @@
           <input id="roomName" type="text" autocomplete="off" placeholder="demo-room-1" />
         </label>
       </div>
-
       <label class="check">
         <input id="enableCamera" type="checkbox" />
         <span>تشغيل الكاميرا عند الانضمام (اتركه مغلقاً عند تجربة متصفحين على نفس الجهاز)</span>
       </label>
-
       <div class="actions">
         <button type="button" id="joinBtn" class="btn primary">انضم للجلسة</button>
-        <button type="button" id="toggleCameraBtn" class="btn ghost" disabled>إيقاف الكاميرا</button>
-        <button type="button" id="leaveBtn" class="btn ghost" disabled>مغادرة</button>
         <button type="button" id="suggestRoomBtn" class="btn link">اقتراح اسم غرفة</button>
       </div>
-
       <p id="status" class="status" role="status">جاهز للانضمام.</p>
     </section>
-
     <section class="stage" id="stage" hidden>
-      <div class="meet-toolbar">
-        <span id="roomBadge" class="room-badge"></span>
-        <div class="meet-controls">
-          <button type="button" id="toggleMicBtn" class="ctrl-btn" disabled title="ميكروفون">🎤</button>
-          <button type="button" id="toggleCameraBtnBar" class="ctrl-btn" disabled title="كاميرا">📷</button>
-          <button type="button" id="leaveBtnBar" class="ctrl-btn danger" disabled title="مغادرة">Leave</button>
-        </div>
+      <div class="stage-bar">
+        <span id="roomBadge" class="badge room-badge">الغرفة</span>
+        <span id="peopleBadge" class="badge people-badge" aria-live="polite">0 مشاركين</span>
       </div>
-      <div id="meetGrid" class="meet-grid" aria-live="polite"></div>
+      <div id="meetGrid" class="meet-grid" data-count="1" style="--cols: 1"></div>
     </section>
   </main>
-
+  <nav class="dock" id="dock" aria-label="أدوات الجلسة" hidden>
+    <button type="button" id="toggleMicBtn" class="dock-btn" aria-pressed="true" title="صوت">
+      <span class="dock-icon" aria-hidden="true">&#127908;</span>
+      <span class="dock-label">صوت</span>
+    </button>
+    <button type="button" id="toggleCameraBtn" class="dock-btn" aria-pressed="false" title="كاميرا">
+      <span class="dock-icon" aria-hidden="true">&#128247;</span>
+      <span class="dock-label">كاميرا</span>
+    </button>
+    <button type="button" id="leaveBtn" class="dock-btn leave" title="مغادرة">
+      <span class="dock-icon" aria-hidden="true">&#9211;</span>
+      <span class="dock-label">مغادرة</span>
+    </button>
+  </nav>
   <script src="app.js"></script>
 </body>
 </html>
