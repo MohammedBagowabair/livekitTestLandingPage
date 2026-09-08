@@ -1,7 +1,7 @@
-(() => {
+﻿(() => {
   const LivekitClient = window.LivekitClient;
   if (!LivekitClient) {
-    setStatus("تعذر تحميل مكتبة LiveKit. تحقق من الاتصال بالإنترنت.", true);
+    setStatus("ØªØ¹Ø°Ø± ØªØ­Ù…ÙŠÙ„ Ù…ÙƒØªØ¨Ø© LiveKit. ØªØ­Ù‚Ù‚ Ù…Ù† Ø§Ù„Ø§ØªØµØ§Ù„ Ø¨Ø§Ù„Ø¥Ù†ØªØ±Ù†Øª.", true);
     return;
   }
 
@@ -30,7 +30,7 @@
 
   restoreForm();
   setStatus(
-    "جاهز. لا حاجة لـ JWT — أدخل اسم الغرفة واسمك ثم انضم (يتطلب API مجهول + LiveKit مفعّل).",
+    "Ø¬Ø§Ù‡Ø². Ù„Ø§ Ø­Ø§Ø¬Ø© Ù„Ù€ JWT â€” Ø£Ø¯Ø®Ù„ Ø§Ø³Ù… Ø§Ù„ØºØ±ÙØ© ÙˆØ§Ø³Ù…Ùƒ Ø«Ù… Ø§Ù†Ø¶Ù… (ÙŠØªØ·Ù„Ø¨ API Ù…Ø¬Ù‡ÙˆÙ„ + LiveKit Ù…ÙØ¹Ù‘Ù„).",
     false,
     true
   );
@@ -55,19 +55,19 @@
 
   async function joinRoom() {
     const apiBaseUrl = apiBaseUrlInput.value.trim().replace(/\/+$/, "");
-    const displayName = displayNameInput.value.trim() || `مشارك-${clientInstanceId.slice(0, 6)}`;
+    const displayName = displayNameInput.value.trim() || `Ù…Ø´Ø§Ø±Ùƒ-${clientInstanceId.slice(0, 6)}`;
     const roomName = roomNameInput.value.trim();
     const wantCamera = !!enableCameraInput.checked;
 
     if (!apiBaseUrl || !roomName) {
-      setStatus("يرجى تعبئة عنوان الـ API واسم الغرفة.", true);
+      setStatus("ÙŠØ±Ø¬Ù‰ ØªØ¹Ø¨Ø¦Ø© Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ù€ API ÙˆØ§Ø³Ù… Ø§Ù„ØºØ±ÙØ©.", true);
       return;
     }
 
 
     persistForm();
     setBusy(true);
-    setStatus("جاري الاتصال…");
+    setStatus("Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø§ØªØµØ§Ù„â€¦");
 
     try {
       const tokenResponse = await fetch(`${apiBaseUrl}/api/demo/livekit/token`, {
@@ -88,9 +88,26 @@
       }
 
       const { Room, RoomEvent, Track, DisconnectReason } = LivekitClient;
+      // Low-latency defaults for small demo rooms (2–few peers).
+      // Does not touch WaslAcademy product apps — this Pages site only.
       room = new Room({
         adaptiveStream: true,
-        dynacast: true,
+        // Dynacast helps large rooms; for 1:1 / small demos it adds negotiation overhead.
+        dynacast: false,
+        audioCaptureDefaults: {
+          autoGainControl: true,
+          echoCancellation: true,
+          noiseSuppression: true,
+          // Prefer lowest buffer the browser will give (best-effort).
+          latency: 0,
+          channelCount: 1,
+        },
+        publishDefaults: {
+          // Speech-oriented audio; avoid heavy video simulcast defaults for mic-only demos.
+          dtx: true,
+          red: true,
+          forceStereo: false,
+        },
       });
 
       room
@@ -105,7 +122,7 @@
         })
         .on(RoomEvent.Disconnected, (reason) => {
           const reasonText = formatDisconnectReason(reason, DisconnectReason);
-          setStatus(`تم قطع الاتصال: ${reasonText}`, true);
+          setStatus(`ØªÙ… Ù‚Ø·Ø¹ Ø§Ù„Ø§ØªØµØ§Ù„: ${reasonText}`, true);
           room = null;
           resetStage();
           setBusy(false);
@@ -121,10 +138,16 @@
 
       let mediaWarning = "";
       try {
-        await room.localParticipant.setMicrophoneEnabled(true);
+        await room.localParticipant.setMicrophoneEnabled(true, {
+          autoGainControl: true,
+          echoCancellation: true,
+          noiseSuppression: true,
+          latency: 0,
+          channelCount: 1,
+        });
       } catch (micError) {
         console.warn(micError);
-        mediaWarning += "تعذر تشغيل الميكروفون. ";
+        mediaWarning += "ØªØ¹Ø°Ø± ØªØ´ØºÙŠÙ„ Ø§Ù„Ù…ÙŠÙƒØ±ÙˆÙÙˆÙ†. ";
       }
 
       if (wantCamera) {
@@ -134,25 +157,25 @@
         } catch (cameraError) {
           console.warn(cameraError);
           mediaWarning +=
-            "تعذر تشغيل الكاميرا على هذا الجهاز (غالباً مستخدمة في المتصفح الآخر). يمكنك البقاء بالصوت فقط. ";
+            "ØªØ¹Ø°Ø± ØªØ´ØºÙŠÙ„ Ø§Ù„ÙƒØ§Ù…ÙŠØ±Ø§ Ø¹Ù„Ù‰ Ù‡Ø°Ø§ Ø§Ù„Ø¬Ù‡Ø§Ø² (ØºØ§Ù„Ø¨Ø§Ù‹ Ù…Ø³ØªØ®Ø¯Ù…Ø© ÙÙŠ Ø§Ù„Ù…ØªØµÙØ­ Ø§Ù„Ø¢Ø®Ø±). ÙŠÙ…ÙƒÙ†Ùƒ Ø§Ù„Ø¨Ù‚Ø§Ø¡ Ø¨Ø§Ù„ØµÙˆØª ÙÙ‚Ø·. ";
         }
       }
 
       const remoteCount = room.remoteParticipants.size;
       const base =
-        `متصل كهوية ${payload.identity}. مشاركون آخرون الآن: ${remoteCount}. ` +
-        "في كل متصفح: نفس اسم الغرفة، أسماء عرض مختلفة.";
+        `Ù…ØªØµÙ„ ÙƒÙ‡ÙˆÙŠØ© ${payload.identity}. Ù…Ø´Ø§Ø±ÙƒÙˆÙ† Ø¢Ø®Ø±ÙˆÙ† Ø§Ù„Ø¢Ù†: ${remoteCount}. ` +
+        "ÙÙŠ ÙƒÙ„ Ù…ØªØµÙØ­: Ù†ÙØ³ Ø§Ø³Ù… Ø§Ù„ØºØ±ÙØ©ØŒ Ø£Ø³Ù…Ø§Ø¡ Ø¹Ø±Ø¶ Ù…Ø®ØªÙ„ÙØ©.";
 
       if (mediaWarning) {
         setStatus(mediaWarning + base, true);
       } else if (!wantCamera) {
-        setStatus("متصل بدون كاميرا (أنسب لجهازين على نفس الجهاز). " + base, false, true);
+        setStatus("Ù…ØªØµÙ„ Ø¨Ø¯ÙˆÙ† ÙƒØ§Ù…ÙŠØ±Ø§ (Ø£Ù†Ø³Ø¨ Ù„Ø¬Ù‡Ø§Ø²ÙŠÙ† Ø¹Ù„Ù‰ Ù†ÙØ³ Ø§Ù„Ø¬Ù‡Ø§Ø²). " + base, false, true);
       } else {
         setStatus(base, false, true);
       }
     } catch (error) {
       console.error(error);
-      const message = error instanceof Error ? error.message : "فشل الانضمام للجلسة.";
+      const message = error instanceof Error ? error.message : "ÙØ´Ù„ Ø§Ù„Ø§Ù†Ø¶Ù…Ø§Ù… Ù„Ù„Ø¬Ù„Ø³Ø©.";
       await cleanupConnection();
       setStatus(message, true);
       setBusy(false);
@@ -161,7 +184,7 @@
 
   async function enableCameraNow() {
     if (!room) {
-      setStatus("انضم للجلسة أولاً.", true);
+      setStatus("Ø§Ù†Ø¶Ù… Ù„Ù„Ø¬Ù„Ø³Ø© Ø£ÙˆÙ„Ø§Ù‹.", true);
       return;
     }
 
@@ -169,11 +192,11 @@
       await room.localParticipant.setCameraEnabled(true);
       const { Track } = LivekitClient;
       attachLocalCamera(Track);
-      setStatus("تم تشغيل الكاميرا.", false, true);
+      setStatus("ØªÙ… ØªØ´ØºÙŠÙ„ Ø§Ù„ÙƒØ§Ù…ÙŠØ±Ø§.", false, true);
     } catch (error) {
       console.warn(error);
       setStatus(
-        "تعذر تشغيل الكاميرا. على نفس الجهاز غالباً متصفح واحد فقط يستطيع استخدام الكاميرا.",
+        "ØªØ¹Ø°Ø± ØªØ´ØºÙŠÙ„ Ø§Ù„ÙƒØ§Ù…ÙŠØ±Ø§. Ø¹Ù„Ù‰ Ù†ÙØ³ Ø§Ù„Ø¬Ù‡Ø§Ø² ØºØ§Ù„Ø¨Ø§Ù‹ Ù…ØªØµÙØ­ ÙˆØ§Ø­Ø¯ ÙÙ‚Ø· ÙŠØ³ØªØ·ÙŠØ¹ Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„ÙƒØ§Ù…ÙŠØ±Ø§.",
         true
       );
     }
@@ -190,7 +213,7 @@
 
   async function leaveRoom() {
     await cleanupConnection();
-    setStatus("غادرت الجلسة. جاهز للانضمام مجدداً.");
+    setStatus("ØºØ§Ø¯Ø±Øª Ø§Ù„Ø¬Ù„Ø³Ø©. Ø¬Ø§Ù‡Ø² Ù„Ù„Ø§Ù†Ø¶Ù…Ø§Ù… Ù…Ø¬Ø¯Ø¯Ø§Ù‹.");
   }
 
   async function cleanupConnection() {
@@ -324,34 +347,36 @@
       return `${payload.message}${payload.code ? ` (${payload.code})` : ""}`;
     }
     if (status === 401 || status === 403) {
-      return "الـ API ما زال يطلب تسجيل دخول. انشر نسخة AllowAnonymous من /api/demo/livekit/token أولاً.";
+      return "Ø§Ù„Ù€ API Ù…Ø§ Ø²Ø§Ù„ ÙŠØ·Ù„Ø¨ ØªØ³Ø¬ÙŠÙ„ Ø¯Ø®ÙˆÙ„. Ø§Ù†Ø´Ø± Ù†Ø³Ø®Ø© AllowAnonymous Ù…Ù† /api/demo/livekit/token Ø£ÙˆÙ„Ø§Ù‹.";
     }
     if (status === 0) {
-      return "تعذر الوصول للـ API (شبكة أو توقف الخدمة). تحقق من نشر المسار وأن الخادم يعمل.";
+      return "ØªØ¹Ø°Ø± Ø§Ù„ÙˆØµÙˆÙ„ Ù„Ù„Ù€ API (Ø´Ø¨ÙƒØ© Ø£Ùˆ ØªÙˆÙ‚Ù Ø§Ù„Ø®Ø¯Ù…Ø©). ØªØ­Ù‚Ù‚ Ù…Ù† Ù†Ø´Ø± Ø§Ù„Ù…Ø³Ø§Ø± ÙˆØ£Ù† Ø§Ù„Ø®Ø§Ø¯Ù… ÙŠØ¹Ù…Ù„.";
     }
-    return `فشل طلب رمز الغرفة (HTTP ${status}). تأكد أن LiveKit مفعّل (LiveKit__Enabled=true) وأن الـ API مجهول الهوية.`;
+    return `ÙØ´Ù„ Ø·Ù„Ø¨ Ø±Ù…Ø² Ø§Ù„ØºØ±ÙØ© (HTTP ${status}). ØªØ£ÙƒØ¯ Ø£Ù† LiveKit Ù…ÙØ¹Ù‘Ù„ (LiveKit__Enabled=true) ÙˆØ£Ù† Ø§Ù„Ù€ API Ù…Ø¬Ù‡ÙˆÙ„ Ø§Ù„Ù‡ÙˆÙŠØ©.`;
   }
 
   function formatDisconnectReason(reason, DisconnectReason) {
     if (reason == null) {
-      return "سبب غير معروف";
+      return "Ø³Ø¨Ø¨ ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙ";
     }
 
     if (DisconnectReason) {
       if (reason === DisconnectReason.DUPLICATE_IDENTITY || reason === "DUPLICATE_IDENTITY") {
-        return "هوية مكررة — متصفح آخر دخل بنفس الهوية. أعد الانضمام (تُنشأ هوية جديدة لكل طلب).";
+        return "Ù‡ÙˆÙŠØ© Ù…ÙƒØ±Ø±Ø© â€” Ù…ØªØµÙØ­ Ø¢Ø®Ø± Ø¯Ø®Ù„ Ø¨Ù†ÙØ³ Ø§Ù„Ù‡ÙˆÙŠØ©. Ø£Ø¹Ø¯ Ø§Ù„Ø§Ù†Ø¶Ù…Ø§Ù… (ØªÙÙ†Ø´Ø£ Ù‡ÙˆÙŠØ© Ø¬Ø¯ÙŠØ¯Ø© Ù„ÙƒÙ„ Ø·Ù„Ø¨).";
       }
       if (reason === DisconnectReason.CLIENT_INITIATED || reason === "CLIENT_INITIATED") {
-        return "تم المغادرة من هذا المتصفح.";
+        return "ØªÙ… Ø§Ù„Ù…ØºØ§Ø¯Ø±Ø© Ù…Ù† Ù‡Ø°Ø§ Ø§Ù„Ù…ØªØµÙØ­.";
       }
       if (reason === DisconnectReason.ROOM_DELETED || reason === "ROOM_DELETED") {
-        return "تم إغلاق الغرفة.";
+        return "ØªÙ… Ø¥ØºÙ„Ø§Ù‚ Ø§Ù„ØºØ±ÙØ©.";
       }
       if (reason === DisconnectReason.JOIN_FAILURE || reason === "JOIN_FAILURE") {
-        return "فشل الانضمام / شبكة.";
+        return "ÙØ´Ù„ Ø§Ù„Ø§Ù†Ø¶Ù…Ø§Ù… / Ø´Ø¨ÙƒØ©.";
       }
     }
 
     return String(reason);
   }
 })();
+
+
